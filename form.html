@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Boost Prediction</title>
+</head>
+<body>
+  <h2>Boost Predictor</h2>
+
+  <form id="predictForm">
+    <label>Item Name:
+      <select id="itemSelect" name="item_name" required></select>
+    </label><br>
+    <label>Item ID: <input type="number" name="item_id" id="item_id" readonly></label><br>
+    
+<input type="hidden" name="sales" id="sales">
+<input type="hidden" name="average" id="average">
+
+
+
+    <label>Cuisine ID: <input type="number" name="cuisine_id" id="cuisine_id" readonly></label><br>
+    <button type="submit">Boost</button>
+  </form>
+
+  <!-- Only show errors here, not main prediction -->
+  <h3 id="mainResult" style="color: red;"></h3>
+  <div id="tableResult"></div>
+
+  <script>
+    async function loadItems() {
+      const res = await fetch("/items");
+      const data = await res.json();
+      const select = document.getElementById("itemSelect");
+
+      data.forEach(item => {
+        const option = document.createElement("option");
+        option.value = item.item_name;
+        option.textContent = item.item_name;
+        option.dataset.item = JSON.stringify(item);
+        select.appendChild(option);
+      });
+
+      select.addEventListener("change", () => {
+        const selected = JSON.parse(select.selectedOptions[0].dataset.item);
+        document.getElementById("item_id").value = selected.item_id;
+        document.getElementById("sales").value = selected.sales;
+        document.getElementById("average").value = selected.average;
+        document.getElementById("cuisine_id").value = selected.cuisine_id;
+      });
+    }
+
+    document.getElementById('predictForm').addEventListener('submit', async function (event) {
+      event.preventDefault();
+      const formData = new FormData(event.target);
+
+      const data = {
+        item_id: parseInt(formData.get('item_id')),
+        sales: parseFloat(formData.get('sales')),
+        average: parseFloat(formData.get('average')),
+        cuisine_id: parseInt(formData.get('cuisine_id'))
+      };
+
+      const response = await fetch('/predict_all/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      const result = await response.json();
+
+      // ❌ No main prediction display
+      if (result.error) {
+        document.getElementById('mainResult').innerText = `Error: ${result.error}`;
+      } else {
+        document.getElementById('mainResult').innerText = '';
+      }
+
+      if (result.time_block_predictions) {
+        const rows = result.time_block_predictions.map(r => `
+          <tr>
+            <td>${r.time_block}</td>
+            <td>${r.prediction}</td>
+          </tr>
+        `).join('');
+
+        document.getElementById('tableResult').innerHTML = `
+          <h4>Predictions across all time blocks for this item</h4>
+          <table border="1">
+            <tr><th>Time Block</th><th>Prediction</th></tr>
+            ${rows}
+          </table>
+        `;
+      }
+    });
+
+    loadItems();
+  </script>
+</body>
+</html>
